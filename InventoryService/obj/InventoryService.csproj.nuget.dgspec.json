@@ -79,6 +79,10 @@
             "RabbitMQ.Client": {
               "target": "Package",
               "version": "[7.1.2, )"
+            },
+            "Swashbuckle.AspNetCore": {
+              "target": "Package",
+              "version": "[9.0.4, )"
             }
           },
           "imports": [
