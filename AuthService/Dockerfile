@@ -1,17 +1,16 @@
-﻿FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+﻿FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
 
-# Copiar o arquivo de projeto primeiro (para melhor cache)
-COPY ["AuthService.csproj", "."]
-RUN dotnet restore "AuthService.csproj"
+COPY *.csproj ./
+RUN dotnet restore
 
-# Copiar o resto do código fonte
 COPY . .
 RUN dotnet publish -c Release -o /app
 
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+# runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
 WORKDIR /app
 COPY --from=build /app .
-ENV ASPNETCORE_URLS=http://+:5001
-EXPOSE 5001
-ENTRYPOINT ["dotnet", "AuthService.dll"]
+ENV ASPNETCORE_URLS=http://+:5000
+EXPOSE 5000
+ENTRYPOINT ["dotnet", "AuthService.dll"]   # troque o nome do DLL pelo do projeto correto
