@@ -1,0 +1,30 @@
+# Arquivos do Docker
+Dockerfile*
+.dockerignore
+
+# Arquivos do Git
+.git
+.gitignore
+
+# Arquivos de desenvolvimento
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Arquivos de build do .NET
+bin/
+obj/
+*.csproj.user
+
+# Arquivos de configuração local
+.env
+*.env.local
+
+# Logs
+*.log
+logs/
+
+# Arquivos temporários
+tmp/
+temp/
