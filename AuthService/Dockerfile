@@ -1,7 +1,12 @@
 ﻿FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY *.csproj .
-RUN dotnet restore
+
+# Copiar o arquivo de projeto primeiro (para melhor cache)
+COPY ["AuthService.csproj", "."]
+RUN dotnet restore "AuthService.csproj"
+
+# Copiar o resto do código fonte
+COPY . .
 RUN dotnet publish -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
