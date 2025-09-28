@@ -13,7 +13,7 @@ public class InventoryDbContextFactory : IDesignTimeDbContextFactory<InventoryDb
         var port = Environment.GetEnvironmentVariable("SQLSERVER_PORT") ?? "1433";
         var db = Environment.GetEnvironmentVariable("INVENTORY_DB") ?? "InventoryDb";
         var user = "sa";
-        var password = Environment.GetEnvironmentVariable("MSSQL_SA_PASSWORD") ?? "YourStrong!Passw0rd";
+        var password = Environment.GetEnvironmentVariable("MSSQL_SA_PASSWORD") ?? "Danu1985";
 
         var connectionString = $"Server={host},{port};Database={db};User Id={user};Password={password};TrustServerCertificate=True;";
 
