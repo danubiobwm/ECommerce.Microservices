@@ -1,7 +1,11 @@
+@baseUrl = http://localhost:8000/api
+@token = {{token}}
+@productId = {{productId}}
+@orderId = {{orderId}}
+
 ### 1) Login como admin (gera JWT)
 
-POST http://localhost:8000/api/auth/login
-#(http://localhost:8000/api/auth/login)
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
@@ -13,8 +17,7 @@ Content-Type: application/json
 
 ### 2) Login como usuário comum
 
-POST http://localhost:8000/api/auth/login
-#(http://localhost:8000/api/auth/login)
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
@@ -26,8 +29,7 @@ Content-Type: application/json
 
 ### 3) Criar produto (somente Admin)
 
-POST http://localhost:8000/api/products
-#(http://localhost:8000/api/products)
+POST {{baseUrl}}/products
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -42,21 +44,19 @@ Content-Type: application/json
 
 ### 4) Listar produtos (público)
 
-GET http://localhost:8000/api/products
-(http://localhost:8000/api/products)
+GET {{baseUrl}}/products
 
 ###
 
 ### 5) Buscar produto por ID
 
-GET http://localhost:8000/api/products/{{productId}}
-#(http://localhost:8000/api/products/{{productId}})
+GET {{baseUrl}}/products/{{productId}}
 
 ###
 
 ### 6) Verificar disponibilidade de produtos
 
-POST http://localhost:8000/api/products/check(http://localhost:8000/api/products/check)
+POST {{baseUrl}}/products/check
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -73,8 +73,7 @@ Content-Type: application/json
 
 ### 7) Criar pedido
 
-POST http://localhost:8000/api/orders
-#(http://localhost:8000/api/orders)
+POST {{baseUrl}}/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -91,8 +90,7 @@ Content-Type: application/json
 
 ### 8) Buscar pedido por ID
 
-GET http://localhost:8000/api/orders/{{orderId}}
-#(http://localhost:8000/api/orders/{{orderId}})
+GET {{baseUrl}}/orders/{{orderId}}
 Authorization: Bearer {{token}}
 
 ###
