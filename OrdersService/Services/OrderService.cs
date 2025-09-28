@@ -11,6 +11,7 @@ public class OrderService
     private readonly OrdersDbContext _db;
     private readonly IHttpClientFactory _http;
     private readonly IConfiguration _config;
+
     public OrderService(OrdersDbContext db, IHttpClientFactory http, IConfiguration config)
     {
         _db = db; _http = http; _config = config;
@@ -47,21 +48,34 @@ public class OrderService
 
     private void PublishOrderCreatedEvent(Order order)
     {
-        var factory = new ConnectionFactory
+        try
         {
-            HostName = _config["RABBITMQ__HOST"] ?? "rabbitmq",
-            UserName = _config["RABBITMQ__USER"] ?? "guest",
-            Password = _config["RABBITMQ__PASS"] ?? "guest"
-        };
-        using var connection = factory.CreateConnection();
-        using var channel = connection.CreateModel();
-        channel.ExchangeDeclare("orders", ExchangeType.Fanout, durable: true);
-        var evt = new
+            var factory = new ConnectionFactory()
+            {
+                HostName = _config["RABBITMQ__HOST"] ?? "rabbitmq",
+                UserName = _config["RABBITMQ__USER"] ?? "guest",
+                Password = _config["RABBITMQ__PASS"] ?? "guest"
+            };
+
+            using var connection = factory.CreateConnection();
+            using var channel = connection.CreateModel();
+
+            channel.ExchangeDeclare(exchange: "orders", type: ExchangeType.Fanout, durable: true);
+
+            var evt = new
+            {
+                OrderId = order.Id,
+                Items = order.Items.Select(i => new { ProductId = i.ProductId, Quantity = i.Quantity }).ToArray()
+            };
+
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(evt));
+            channel.BasicPublish(exchange: "orders", routingKey: "", basicProperties: null, body: body);
+
+            Console.WriteLine($"Evento publicado para o pedido {order.Id}");
+        }
+        catch (Exception ex)
         {
-            OrderId = order.Id,
-            Items = order.Items.Select(i => new { ProductId = i.ProductId, Quantity = i.Quantity }).ToArray()
-        };
-        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(evt));
-        channel.BasicPublish("orders", "", null, body);
+            Console.WriteLine($"Erro ao publicar evento: {ex.Message}");
+        }
     }
 }
