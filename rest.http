@@ -1,0 +1,98 @@
+### 1) Login como admin (gera JWT)
+
+POST http://localhost:8000/api/auth/login
+#(http://localhost:8000/api/auth/login)
+Content-Type: application/json
+
+{
+"username": "admin",
+"password": "admin123"
+}
+
+###
+
+### 2) Login como usuário comum
+
+POST http://localhost:8000/api/auth/login
+#(http://localhost:8000/api/auth/login)
+Content-Type: application/json
+
+{
+"username": "user",
+"password": "user123"
+}
+
+###
+
+### 3) Criar produto (somente Admin)
+
+POST http://localhost:8000/api/products
+#(http://localhost:8000/api/products)
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+"name": "Notebook Dell",
+"description": "Notebook i7 16GB RAM",
+"price": 5500.00,
+"quantity": 10
+}
+
+###
+
+### 4) Listar produtos (público)
+
+GET http://localhost:8000/api/products
+(http://localhost:8000/api/products)
+
+###
+
+### 5) Buscar produto por ID
+
+GET http://localhost:8000/api/products/{{productId}}
+#(http://localhost:8000/api/products/{{productId}})
+
+###
+
+### 6) Verificar disponibilidade de produtos
+
+POST http://localhost:8000/api/products/check(http://localhost:8000/api/products/check)
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+"items": [
+{
+"productId": "{{productId}}",
+"quantity": 2
+}
+]
+}
+
+###
+
+### 7) Criar pedido
+
+POST http://localhost:8000/api/orders
+#(http://localhost:8000/api/orders)
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+"items": [
+{
+"productId": "{{productId}}",
+"quantity": 2
+}
+]
+}
+
+###
+
+### 8) Buscar pedido por ID
+
+GET http://localhost:8000/api/orders/{{orderId}}
+#(http://localhost:8000/api/orders/{{orderId}})
+Authorization: Bearer {{token}}
+
+###

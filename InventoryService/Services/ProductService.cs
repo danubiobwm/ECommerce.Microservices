@@ -1,6 +1,7 @@
 ﻿using InventoryService.Data;
 using InventoryService.Models;
 using InventoryService.Services;
+using Microsoft.EntityFrameworkCore;
 
 public class ProductService : IProductService
 {
