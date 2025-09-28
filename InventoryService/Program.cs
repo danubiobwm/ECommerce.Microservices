@@ -1,75 +1,116 @@
 using InventoryService.Data;
-using InventoryService.Services;
-using InventoryService.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using RabbitMQ.Client;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// read env connection info and build a SQL Server connection string
-// Expected ConnectionStrings__Default format: host,port,sa_password,dbName
-var connRaw = builder.Configuration["ConnectionStrings__Default"] ?? $"{builder.Configuration["SQLSERVER_HOST"]},1433,{builder.Configuration["MSSQL_SA_PASSWORD"]},{builder.Configuration["INVENTORY_DB"]}";
-var parts = connRaw.Split(',');
-var host = parts[0];
-var port = parts.Length > 1 ? parts[1] : "1433";
-var saPass = parts.Length > 2 ? parts[2] : builder.Configuration["MSSQL_SA_PASSWORD"];
-var dbName = parts.Length > 3 ? parts[3] : builder.Configuration["INVENTORY_DB"] ?? "InventoryDb";
-var connectionString = $"Server={host},{port};Database={dbName};User Id=sa;Password={saPass};TrustServerCertificate=True;";
-
-builder.Services.AddDbContext<InventoryDbContext>(opt => opt.UseSqlServer(connectionString));
-
-builder.Services.AddScoped<IProductService, ProductService>();
-builder.Services.AddHostedService<OrderCreatedConsumer>();
-
-builder.Services.AddControllers();
-builder.Services.AddSwaggerGen();
+// Connection string: tente ler de ConnectionStrings:Default, senão de env
+var connectionString = builder.Configuration.GetConnectionString("Default") ??
+                       builder.Configuration["ConnectionStrings__Default"] ??
+                       throw new Exception("Missing ConnectionStrings:Default");
 
 // JWT
-var key = Encoding.UTF8.GetBytes(builder.Configuration["JWT_SECRET"] ?? throw new Exception("Missing JWT_SECRET"));
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.TokenValidationParameters = new TokenValidationParameters
+var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("Missing JWT_SECRET");
+var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerce";
+var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceAudience";
+var key = Encoding.UTF8.GetBytes(jwtSecret);
+
+// DbContext
+builder.Services.AddDbContext<InventoryDbContext>(options =>
+    options.UseSqlServer(connectionString, sql =>
     {
-        ValidateIssuer = true,
-        ValidIssuer = builder.Configuration["JWT_ISSUER"],
-        ValidateAudience = true,
-        ValidAudience = builder.Configuration["JWT_AUDIENCE"],
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key)
-    };
+        // importante: apontar migrations para o assembly correto
+        sql.MigrationsAssembly("InventoryService");
+    }));
+
+// Authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateLifetime = true
+        };
+    });
+
+builder.Services.AddControllers();
+
+// Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "InventoryService", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        In = ParameterLocation.Header,
+        Description = "Use: Bearer {token}",
+        Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey,
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
+        {
+            new OpenApiSecurityScheme {
+                Reference = new OpenApiReference {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[]{}
+        }
+    });
 });
+
+// RabbitMQ - registrar ConnectionFactory (simples)
+builder.Services.AddSingleton(sp =>
+{
+    var factory = new ConnectionFactory()
+    {
+        HostName = builder.Configuration["RABBITMQ_HOST"] ?? "localhost",
+        UserName = builder.Configuration["RABBITMQ_USER"] ?? "guest",
+        Password = builder.Configuration["RABBITMQ_PASS"] ?? "guest",
+        DispatchConsumersAsync = true
+    };
+    return factory;
+});
+
+// (Opcional) registrar serviços específicos de aplicação, repositórios, integration events, etc.
+// builder.Services.AddScoped<IProductRepository, ProductRepository>();
+// builder.Services.AddScoped<IStockService, StockService>();
 
 var app = builder.Build();
 
-// Apply migrations with retry
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-    // retry loop
-    var tried = 0;
-    while (true)
+    // Aplicar migrations automaticamente em dev (opcional)
+    var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    if (env.IsDevelopment())
     {
-        try
-        {
-            db.Database.Migrate();
-            break;
-        }
-        catch
-        {
-            tried++;
-            if (tried > 20) throw;
-            await Task.Delay(3000);
-        }
+        var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+        db.Database.Migrate();
     }
 }
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger(); app.UseSwaggerUI();
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();

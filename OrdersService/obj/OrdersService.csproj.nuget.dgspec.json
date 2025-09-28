@@ -50,6 +50,14 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
+            "MassTransit": {
+              "target": "Package",
+              "version": "[8.5.3, )"
+            },
+            "MassTransit.RabbitMQ": {
+              "target": "Package",
+              "version": "[8.5.3, )"
+            },
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
               "target": "Package",
               "version": "[9.0.9, )"
@@ -78,7 +86,7 @@
             },
             "RabbitMQ.Client": {
               "target": "Package",
-              "version": "[6.8.1, )"
+              "version": "[7.1.2, )"
             },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
