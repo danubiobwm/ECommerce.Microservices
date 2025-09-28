@@ -1,5 +1,4 @@
 ﻿using InventoryService.Services;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
@@ -14,19 +13,25 @@ public class OrderCreatedEvent
     public Guid OrderId { get; set; }
     public List<OrderItem> Items { get; set; } = new();
 }
-public class OrderItem { public Guid ProductId { get; set; } public int Quantity { get; set; } }
+
+public class OrderItem
+{
+    public Guid ProductId { get; set; }
+    public int Quantity { get; set; }
+}
 
 public class OrderCreatedConsumer : BackgroundService
 {
     private readonly IConfiguration _config;
     private readonly ILogger<OrderCreatedConsumer> _logger;
     private readonly IServiceProvider _sp;
-    private IConnection? _connection;
-    private IModel? _channel;
+    private RabbitMQ.Client.IConnection? _connection;
+    private RabbitMQ.Client.IModel? _channel;
 
     public OrderCreatedConsumer(IConfiguration config, ILogger<OrderCreatedConsumer> logger, IServiceProvider sp)
     {
         _config = config; _logger = logger; _sp = sp;
+
         var factory = new ConnectionFactory
         {
             HostName = _config["RABBITMQ__HOST"] ?? "rabbitmq",
@@ -34,6 +39,7 @@ public class OrderCreatedConsumer : BackgroundService
             Password = _config["RABBITMQ__PASS"] ?? "guest",
             DispatchConsumersAsync = true
         };
+
         _connection = factory.CreateConnection();
         _channel = _connection.CreateModel();
         _channel.ExchangeDeclare(exchange: "orders", type: ExchangeType.Fanout, durable: true);
@@ -44,20 +50,27 @@ public class OrderCreatedConsumer : BackgroundService
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var consumer = new AsyncEventingBasicConsumer(_channel);
-        consumer.Received += async (model, ea) => {
+        consumer.Received += async (model, ea) =>
+        {
             try
             {
                 var body = ea.Body.ToArray();
                 var json = Encoding.UTF8.GetString(body);
-                var ev = JsonSerializer.Deserialize<OrderCreatedEvent>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var ev = JsonSerializer.Deserialize<OrderCreatedEvent>(
+                    json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+
                 if (ev != null)
                 {
                     using var scope = _sp.CreateScope();
                     var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
+
                     foreach (var item in ev.Items)
                     {
                         var ok = await productService.ReduceStock(item.ProductId, item.Quantity);
-                        if (!ok) _logger.LogWarning("Falha ao reduzir estoque do produto {id}", item.ProductId);
+                        if (!ok)
+                            _logger.LogWarning("Falha ao reduzir estoque do produto {id}", item.ProductId);
                     }
                 }
             }
@@ -70,6 +83,7 @@ public class OrderCreatedConsumer : BackgroundService
                 _channel?.BasicAck(ea.DeliveryTag, false);
             }
         };
+
         _channel.BasicConsume(queue: "inventory.order.created", autoAck: false, consumer: consumer);
         return Task.CompletedTask;
     }
