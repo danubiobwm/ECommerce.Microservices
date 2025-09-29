@@ -1,11 +1,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copiar o arquivo de projeto primeiro (para melhor cache)
 COPY ["OrdersService.csproj", "."]
 RUN dotnet restore "OrdersService.csproj"
 
-# Copiar o resto do código fonte
 COPY . .
 RUN dotnet publish -c Release -o /app
 

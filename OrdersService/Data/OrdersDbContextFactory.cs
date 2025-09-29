@@ -12,13 +12,11 @@ public class OrdersDbContextFactory : IDesignTimeDbContextFactory<OrdersDbContex
         var host = Environment.GetEnvironmentVariable("SQLSERVER_HOST") ?? "localhost";
         var port = Environment.GetEnvironmentVariable("SQLSERVER_PORT") ?? "1433";
         var db = Environment.GetEnvironmentVariable("ORDERS_DB") ?? "OrdersDb";
-        var user = "sa";
-        var password = Environment.GetEnvironmentVariable("MSSQL_SA_PASSWORD") ?? "Danu1985";
+        var password = Environment.GetEnvironmentVariable("MSSQL_SA_PASSWORD") ?? "YourStrong!Passw0rd";
 
-        var connectionString = $"Server={host},{port};Database={db};User Id={user};Password={password};TrustServerCertificate=True;";
+        var connectionString = $"Server={host},{port};Database={db};User Id=sa;Password={password};TrustServerCertificate=True;";
 
         optionsBuilder.UseSqlServer(connectionString);
-
         return new OrdersDbContext(optionsBuilder.Options);
     }
 }
