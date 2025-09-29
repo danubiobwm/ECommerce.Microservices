@@ -6,45 +6,42 @@ using Ocelot.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// carregue o arquivo ocelot (já presente no projeto)
+// Carregar configuraÃ§Ã£o do Ocelot
 builder.Configuration.AddJsonFile("ocelot.json", optional: false, reloadOnChange: true);
 
-// JWT settings (pegar de appsettings ou env)
+// JWT settings
 var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("Missing JWT_SECRET");
-var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? builder.Configuration["JWT:Issuer"] ?? "ECommerce";
-var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? builder.Configuration["JWT:Audience"] ?? "ECommerceAudience";
-
+var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerce";
+var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceClients";
 var key = Encoding.UTF8.GetBytes(jwtSecret);
 
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false;
-    options.SaveToken = true;
-    options.TokenValidationParameters = new TokenValidationParameters
+// AutenticaÃ§Ã£o JWT
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = true,
-        ValidIssuer = jwtIssuer,
-        ValidateAudience = true,
-        ValidAudience = jwtAudience,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateLifetime = true
-    };
-});
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ValidateLifetime = true
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // Ocelot
 builder.Services.AddOcelot(builder.Configuration);
 
-// Swagger for gateway (opcional: gateway só encaminha, mas útil durante dev)
+// Swagger para o gateway
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    // bearer token in swagger
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
@@ -79,7 +76,6 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Ocelot middleware
 await app.UseOcelot();
 
 app.MapGet("/", () => Results.Ok(new { message = "API Gateway running" }));

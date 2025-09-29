@@ -1,96 +1,109 @@
 @baseUrl = http://localhost:8000/api
-@token = {{token}}
-@productId = {{productId}}
-@orderId = {{orderId}}
+@token =
+@productId =
+@orderId =
 
-### 1) Login como admin (gera JWT)
-
-POST {{baseUrl}}/auth/login
+### 1) Registrar usuário admin (executar primeiro)
+POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-"username": "admin",
-"password": "admin123"
+  "username": "admin",
+  "password": "admin123",
+  "email": "admin@admin.com"
 }
 
 ###
 
-### 2) Login como usuário comum
-
+### 2) Login como admin (gera JWT)
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-"username": "user",
-"password": "user123"
+  "username": "admin",
+  "password": "admin123"
 }
+
+> {%
+    // Script para salvar o token automaticamente
+    client.global.set("token", response.body.token);
+    client.log("Token salvo: " + response.body.token);
+%}
 
 ###
 
 ### 3) Criar produto (somente Admin)
-
 POST {{baseUrl}}/products
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-"name": "Notebook Dell",
-"description": "Notebook i7 16GB RAM",
-"price": 5500.00,
-"quantity": 10
+  "name": "Notebook Dell",
+  "description": "Notebook i7 16GB RAM",
+  "price": 5500.00,
+  "quantity": 10
 }
+
+> {%
+    // Script para salvar o productId
+    if (response.body.id) {
+        client.global.set("productId", response.body.id);
+        client.log("Product ID salvo: " + response.body.id);
+    }
+%}
 
 ###
 
 ### 4) Listar produtos (público)
-
 GET {{baseUrl}}/products
 
 ###
 
 ### 5) Buscar produto por ID
-
 GET {{baseUrl}}/products/{{productId}}
 
 ###
 
 ### 6) Verificar disponibilidade de produtos
-
 POST {{baseUrl}}/products/check
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-"items": [
-{
-"productId": "{{productId}}",
-"quantity": 2
-}
-]
+  "items": [
+    {
+      "productId": "{{productId}}",
+      "quantity": 2
+    }
+  ]
 }
 
 ###
 
 ### 7) Criar pedido
-
 POST {{baseUrl}}/orders
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-"items": [
-{
-"productId": "{{productId}}",
-"quantity": 2
+  "items": [
+    {
+      "productId": "{{productId}}",
+      "quantity": 2
+    }
+  ]
 }
-]
-}
+
+> {%
+    // Script para salvar o orderId
+    if (response.body.order && response.body.order.id) {
+        client.global.set("orderId", response.body.order.id);
+        client.log("Order ID salvo: " + response.body.order.id);
+    }
+%}
 
 ###
 
 ### 8) Buscar pedido por ID
-
 GET {{baseUrl}}/orders/{{orderId}}
 Authorization: Bearer {{token}}
-
-###

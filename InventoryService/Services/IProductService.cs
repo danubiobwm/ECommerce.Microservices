@@ -1,6 +1,4 @@
 ﻿using InventoryService.Models;
-using InventoryService.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace InventoryService.Services;
 

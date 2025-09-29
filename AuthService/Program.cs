@@ -5,10 +5,10 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// JWT config (pegar de appsettings.json ou variáveis de ambiente)
+// JWT config (pegar de appsettings.json ou variï¿½veis de ambiente)
 var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("JWT_SECRET not set");
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerceAuth";
-var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceAudience";
+var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceClients";
 
 var key = Encoding.UTF8.GetBytes(jwtSecret);
 

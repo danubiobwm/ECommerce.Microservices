@@ -5,7 +5,6 @@ COPY ["InventoryService.csproj", "."]
 RUN dotnet restore "InventoryService.csproj"
 
 COPY . .
-
 RUN dotnet publish -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime

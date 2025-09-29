@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace InventoryService.Data.Migrations
 {
     [DbContext(typeof(InventoryDbContext))]
-    [Migration("20250928134447_InitialCreate")]
+    [Migration("20250929121419_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

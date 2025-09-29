@@ -1,109 +1,75 @@
 using InventoryService.Data;
+using InventoryService.Services;
+using InventoryService.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
-using RabbitMQ.Client;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Connection string: tente ler de ConnectionStrings:Default, senão de env
-var connectionString = builder.Configuration.GetConnectionString("Default") ??
-                       builder.Configuration["ConnectionStrings__Default"] ??
-                       throw new Exception("Missing ConnectionStrings:Default");
 
-// JWT
+string connectionString = builder.Configuration["ConnectionStrings__Default"];
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    var host = builder.Configuration["SQLSERVER_HOST"] ?? "localhost";
+    var port = builder.Configuration["SQLSERVER_PORT"] ?? "1433";
+    var dbName = builder.Configuration["INVENTORY_DB"] ?? "InventoryDb";
+    var saPass = builder.Configuration["MSSQL_SA_PASSWORD"] ?? "P@ssw0rd123!";
+    connectionString = $"Server={host},{port};Database={dbName};User Id=sa;Password={saPass};TrustServerCertificate=True;";
+}
+
+builder.Services.AddDbContext<InventoryDbContext>(opt => opt.UseSqlServer(connectionString));
+
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddHostedService<OrderCreatedConsumer>();
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("Missing JWT_SECRET");
-var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerce";
-var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceAudience";
+var issuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerce";
+var audience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceClients";
 var key = Encoding.UTF8.GetBytes(jwtSecret);
 
-// DbContext
-builder.Services.AddDbContext<InventoryDbContext>(options =>
-    options.UseSqlServer(connectionString, sql =>
-    {
-        sql.MigrationsAssembly("InventoryService");
-    }));
-
-// Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = jwtIssuer,
+            ValidIssuer = issuer,
             ValidateAudience = true,
-            ValidAudience = jwtAudience,
+            ValidAudience = audience,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(key),
             ValidateLifetime = true
         };
     });
 
-builder.Services.AddControllers();
-
-// Swagger
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "InventoryService", Version = "v1" });
-
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        In = ParameterLocation.Header,
-        Description = "Use: Bearer {token}",
-        Name = "Authorization",
-        Type = SecuritySchemeType.ApiKey,
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
-        {
-            new OpenApiSecurityScheme {
-                Reference = new OpenApiReference {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[]{}
-        }
-    });
-});
-
-// RabbitMQ - REMOVIDO temporariamente para fazer build passar
-// builder.Services.AddSingleton(sp =>
-// {
-//     var factory = new ConnectionFactory()
-//     {
-//         HostName = builder.Configuration["RABBITMQ_HOST"] ?? "localhost",
-//         UserName = builder.Configuration["RABBITMQ_USER"] ?? "guest",
-//         Password = builder.Configuration["RABBITMQ_PASS"] ?? "guest"
-//     };
-//     return factory;
-// });
-
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
-    if (env.IsDevelopment())
+    var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+    var tried = 0;
+    while (true)
     {
-        var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-        db.Database.Migrate();
+        try { db.Database.Migrate(); break; }
+        catch
+        {
+            tried++;
+            if (tried > 40) throw;
+            await Task.Delay(5000);
+        }
     }
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseRouting();
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseAuthentication();
 app.UseAuthorization();

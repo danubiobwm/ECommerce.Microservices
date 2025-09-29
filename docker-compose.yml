@@ -3,18 +3,24 @@ version: '3.8'
 services:
   mssql:
     image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: ecommerce-mssql
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=${MSSQL_SA_PASSWORD}
     ports:
       - "1433:1433"
     healthcheck:
-      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "${MSSQL_SA_PASSWORD}", "-Q", "SELECT 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${MSSQL_SA_PASSWORD} -Q 'SELECT 1'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
     networks:
       - ecommerce-net
 
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: ecommerce-rabbitmq
     environment:
       - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
@@ -28,6 +34,7 @@ services:
     build:
       context: ./AuthService
       dockerfile: Dockerfile
+    container_name: ecommerce-auth
     environment:
       - ASPNETCORE_URLS=http://+:5001
       - DOTNET_ENVIRONMENT=Development
@@ -41,8 +48,10 @@ services:
     ports:
       - "5001:5001"
     depends_on:
-      - mssql
-      - rabbitmq
+      mssql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - ecommerce-net
 
@@ -50,6 +59,7 @@ services:
     build:
       context: ./InventoryService
       dockerfile: Dockerfile
+    container_name: ecommerce-inventory
     environment:
       - ASPNETCORE_URLS=http://+:5002
       - DOTNET_ENVIRONMENT=Development
@@ -61,8 +71,10 @@ services:
     ports:
       - "5002:5002"
     depends_on:
-      - mssql
-      - rabbitmq
+      mssql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     networks:
       - ecommerce-net
 
@@ -70,6 +82,7 @@ services:
     build:
       context: ./OrdersService
       dockerfile: Dockerfile
+    container_name: ecommerce-orders
     environment:
       - ASPNETCORE_URLS=http://+:5003
       - DOTNET_ENVIRONMENT=Development
@@ -82,9 +95,12 @@ services:
     ports:
       - "5003:5003"
     depends_on:
-      - mssql
-      - rabbitmq
-      - inventory
+      mssql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      inventory:
+        condition: service_started
     networks:
       - ecommerce-net
 
@@ -92,6 +108,7 @@ services:
     build:
       context: ./ApiGateway
       dockerfile: Dockerfile
+    container_name: ecommerce-gateway
     environment:
       - ASPNETCORE_URLS=http://+:${GATEWAY_PORT}
       - DOTNET_ENVIRONMENT=Development
@@ -101,9 +118,12 @@ services:
     ports:
       - "${GATEWAY_PORT}:${GATEWAY_PORT}"
     depends_on:
-      - auth
-      - inventory
-      - orders
+      auth:
+        condition: service_started
+      inventory:
+        condition: service_started
+      orders:
+        condition: service_started
     networks:
       - ecommerce-net
 

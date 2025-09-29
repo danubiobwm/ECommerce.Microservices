@@ -1,7 +1,8 @@
-﻿using InventoryService.Data;
-using InventoryService.Models;
-using InventoryService.Services;
+﻿using InventoryService.Models;
+using InventoryService.Data;
 using Microsoft.EntityFrameworkCore;
+
+namespace InventoryService.Services;
 
 public class ProductService : IProductService
 {
@@ -15,7 +16,9 @@ public class ProductService : IProductService
         await _db.SaveChangesAsync();
         return p;
     }
+
     public Task<List<Product>> GetAll() => _db.Products.ToListAsync();
+
     public Task<Product?> Get(Guid id) => _db.Products.FirstOrDefaultAsync(p => p.Id == id);
 
     public async Task<bool> ReduceStock(Guid productId, int qty)
