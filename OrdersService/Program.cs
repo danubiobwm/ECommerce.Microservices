@@ -1,77 +1,58 @@
-using OrdersService.Data;
-using OrdersService.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using OrdersService.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-string connectionString = builder.Configuration["ConnectionStrings__Default"];
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    var host = builder.Configuration["SQLSERVER_HOST"] ?? "localhost";
-    var port = builder.Configuration["SQLSERVER_PORT"] ?? "1433";
-    var dbName = builder.Configuration["ORDERS_DB"] ?? "OrdersDb";
-    var saPass = builder.Configuration["MSSQL_SA_PASSWORD"] ?? "P@ssw0rd123!";
-    connectionString = $"Server={host},{port};Database={dbName};User Id=sa;Password={saPass};TrustServerCertificate=True;";
-}
+var jwtSecret = builder.Configuration["JWT_SECRET"]
+                ?? builder.Configuration["JWT:Secret"]
+                ?? "dev_fallback_jwt_secret_ChangeMe!";
 
-builder.Services.AddDbContext<OrdersDbContext>(opt => opt.UseSqlServer(connectionString));
-builder.Services.AddScoped<OrderService>();
+var key = Encoding.ASCII.GetBytes(jwtSecret);
 
-builder.Services.AddHttpClient("inventory", c =>
+builder.Services.AddAuthentication(options =>
 {
-    c.BaseAddress = new Uri(builder.Configuration["INVENTORY_URL"] ?? "http://inventory:5002");
-    c.Timeout = TimeSpan.FromSeconds(10);
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ClockSkew = TimeSpan.Zero
+    };
 });
+
+builder.Services.AddDbContext<OrdersDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("Missing JWT_SECRET");
-var key = Encoding.UTF8.GetBytes(jwtSecret);
-
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = builder.Configuration["JWT_ISSUER"],
-            ValidateAudience = true,
-            ValidAudience = builder.Configuration["JWT_AUDIENCE"],
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-    });
-
-
-
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
-    var tried = 0;
-    while (true)
-    {
-        try { db.Database.Migrate(); break; }
-        catch
-        {
-            tried++;
-            if (tried > 40) throw;
-            await Task.Delay(5000);
-        }
-    }
+    db.Database.Migrate();
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
