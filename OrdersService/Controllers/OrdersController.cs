@@ -1,35 +1,53 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrdersService.DTOs;
-using OrdersService.Services;
-using OrdersService.Data;
 using Microsoft.EntityFrameworkCore;
+using OrdersService.Data;
+using OrdersService.Models;
 
-namespace OrdersService.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-[Authorize]
-public class OrdersController : ControllerBase
+namespace OrdersService.Controllers
 {
-    private readonly OrderService _orderService;
-    private readonly OrdersDbContext _db;
-    public OrdersController(OrderService orderService, OrdersDbContext db) { _orderService = orderService; _db = db; }
-
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateOrderDto dto)
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
+    public class OrdersController : ControllerBase
     {
-        var items = dto.Items.Select(i => (i.ProductId, i.Quantity)).ToList();
-        var (success, msg, order) = await _orderService.CreateOrderAsync(items);
-        if (!success) return BadRequest(new { message = msg });
-        return CreatedAtAction(nameof(GetById), new { id = order!.Id }, order);
-    }
+        private readonly OrdersDbContext _context;
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetById(Guid id)
-    {
-        var order = await _db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id);
-        if (order == null) return NotFound();
-        return Ok(order);
+        public OrdersController(OrdersDbContext context)
+        {
+            _context = context;
+        }
+
+        // GET: api/orders
+        [HttpGet]
+        [AllowAnonymous] // só para teste rápido
+        public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
+        {
+            return await _context.Orders.Include(o => o.Items).ToListAsync();
+        }
+
+        // GET: api/orders/{id}
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Order>> GetOrder(int id)
+        {
+            var order = await _context.Orders
+                                      .Include(o => o.Items)
+                                      .FirstOrDefaultAsync(o => o.Id == id);
+
+            if (order == null)
+                return NotFound();
+
+            return order;
+        }
+
+        // POST: api/orders
+        [HttpPost]
+        public async Task<ActionResult<Order>> CreateOrder(Order order)
+        {
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
+        }
     }
 }

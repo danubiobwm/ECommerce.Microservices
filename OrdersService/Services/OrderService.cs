@@ -1,81 +1,60 @@
-﻿using OrdersService.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using OrdersService.Data;
 using OrdersService.Models;
-using RabbitMQ.Client;
-using System.Text;
-using System.Text.Json;
 
-namespace OrdersService.Services;
-
-public class OrderService
+namespace OrdersService.Services
 {
-    private readonly OrdersDbContext _db;
-    private readonly IHttpClientFactory _http;
-    private readonly IConfiguration _config;
-
-    public OrderService(OrdersDbContext db, IHttpClientFactory http, IConfiguration config)
+    public class OrderService
     {
-        _db = db; _http = http; _config = config;
-    }
+        private readonly OrdersDbContext _context;
 
-    public async Task<(bool Success, string? Message, Order? Order)> CreateOrderAsync(List<(Guid ProductId, int Quantity)> items)
-    {
-        // 1) check inventory via InventoryService
-        var client = _http.CreateClient("inventory");
-        var checkObj = new { items = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity }).ToList() };
-        var resp = await client.PostAsJsonAsync("/api/products/check", new { items = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity }) });
-        if (!resp.IsSuccessStatusCode) return (false, "Falha ao validar estoque", null);
-        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
-        var allAvailable = json.GetProperty("allAvailable").GetBoolean();
-        if (!allAvailable)
+        public OrderService(OrdersDbContext context)
         {
-            return (false, "Produtos indisponíveis", null);
+            _context = context;
         }
 
-        // 2) create order
-        var order = new Order { Id = Guid.NewGuid(), Status = "Confirmed", CreatedAt = DateTime.UtcNow };
-        foreach (var it in items)
+        public async Task<Order?> GetOrderByIdAsync(int id)
         {
-            order.Items.Add(new OrderItem { Id = Guid.NewGuid(), ProductId = it.ProductId, Quantity = it.Quantity, UnitPrice = 0 });
+            return await _context.Orders
+                                 .Include(o => o.Items)
+                                 .FirstOrDefaultAsync(o => o.Id == id);
         }
-        _db.Orders.Add(order);
-        await _db.SaveChangesAsync();
 
-        // 3) publish event to RabbitMQ
-        PublishOrderCreatedEvent(order);
-
-        return (true, null, order);
-    }
-
-    private void PublishOrderCreatedEvent(Order order)
-    {
-        try
+        public async Task<IEnumerable<Order>> GetAllOrdersAsync()
         {
-            var factory = new ConnectionFactory()
-            {
-                HostName = _config["RABBITMQ__HOST"] ?? "rabbitmq",
-                UserName = _config["RABBITMQ__USER"] ?? "guest",
-                Password = _config["RABBITMQ__PASS"] ?? "guest"
-            };
-
-            using var connection = factory.CreateConnection();
-            using var channel = connection.CreateModel();
-
-            channel.ExchangeDeclare(exchange: "orders", type: ExchangeType.Fanout, durable: true);
-
-            var evt = new
-            {
-                OrderId = order.Id,
-                Items = order.Items.Select(i => new { ProductId = i.ProductId, Quantity = i.Quantity }).ToArray()
-            };
-
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(evt));
-            channel.BasicPublish(exchange: "orders", routingKey: "", basicProperties: null, body: body);
-
-            Console.WriteLine($"Evento publicado para o pedido {order.Id}");
+            return await _context.Orders.Include(o => o.Items).ToListAsync();
         }
-        catch (Exception ex)
+
+        public async Task<Order> CreateOrderAsync(Order order)
         {
-            Console.WriteLine($"Erro ao publicar evento: {ex.Message}");
+            order.Status = "Pending";
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+            return order;
+        }
+
+        public async Task<bool> UpdateOrderStatusAsync(int orderId, string status)
+        {
+            var order = await _context.Orders.FindAsync(orderId);
+            if (order == null)
+                return false;
+
+            order.Status = status;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> DeleteOrderAsync(int orderId)
+        {
+            var order = await _context.Orders.Include(o => o.Items)
+                                             .FirstOrDefaultAsync(o => o.Id == orderId);
+            if (order == null)
+                return false;
+
+            _context.OrderItems.RemoveRange(order.Items);
+            _context.Orders.Remove(order);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }
