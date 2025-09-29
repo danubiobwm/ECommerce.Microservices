@@ -1,43 +1,55 @@
-﻿using InventoryService.Models;
-using InventoryService.Data;
+﻿using InventoryService.Data;
+using InventoryService.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace InventoryService.Services;
-
-public class ProductService : IProductService
+namespace InventoryService.Services
 {
-    private readonly InventoryDbContext _db;
-    public ProductService(InventoryDbContext db) { _db = db; }
-
-    public async Task<Product> Create(Product p)
+    public class ProductService
     {
-        p.Id = Guid.NewGuid();
-        _db.Products.Add(p);
-        await _db.SaveChangesAsync();
-        return p;
-    }
+        private readonly InventoryDbContext _context;
 
-    public Task<List<Product>> GetAll() => _db.Products.ToListAsync();
-
-    public Task<Product?> Get(Guid id) => _db.Products.FirstOrDefaultAsync(p => p.Id == id);
-
-    public async Task<bool> ReduceStock(Guid productId, int qty)
-    {
-        var product = await _db.Products.FindAsync(productId);
-        if (product == null || product.Quantity < qty) return false;
-        product.Quantity -= qty;
-        await _db.SaveChangesAsync();
-        return true;
-    }
-
-    public async Task<CheckResult> CheckAvailability(List<CheckItem> items)
-    {
-        var unavailable = new List<CheckItem>();
-        foreach (var it in items)
+        public ProductService(InventoryDbContext context)
         {
-            var p = await _db.Products.FindAsync(it.ProductId);
-            if (p == null || p.Quantity < it.Quantity) unavailable.Add(it);
+            _context = context;
         }
-        return new CheckResult(unavailable.Count == 0, unavailable);
+
+        public async Task<Product?> GetProductByIdAsync(int id)
+        {
+            return await _context.Products.FirstOrDefaultAsync(p => p.Id == id);
+        }
+
+        public async Task<IEnumerable<Product>> GetAllProductsAsync()
+        {
+            return await _context.Products.ToListAsync();
+        }
+
+        public async Task<Product> CreateProductAsync(Product product)
+        {
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync();
+            return product;
+        }
+
+        public async Task<bool> UpdateStockAsync(int productId, int quantityChange)
+        {
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
+            if (product == null)
+                return false;
+
+            product.Stock += quantityChange;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> DeleteProductAsync(int productId)
+        {
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
+            if (product == null)
+                return false;
+
+            _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }

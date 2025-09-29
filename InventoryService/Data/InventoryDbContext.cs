@@ -1,22 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using InventoryService.Models;
 
-namespace InventoryService.Data;
-
-public class InventoryDbContext : DbContext
+namespace InventoryService.Data
 {
-    public InventoryDbContext(DbContextOptions<InventoryDbContext> opts) : base(opts) { }
-
-    public DbSet<Product> Products { get; set; } = null!;
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    public class InventoryDbContext : DbContext
     {
-        modelBuilder.Entity<Product>().HasKey(p => p.Id);
+        public InventoryDbContext(DbContextOptions<InventoryDbContext> options)
+            : base(options) { }
 
-        modelBuilder.Entity<Product>()
-            .Property(p => p.Price)
-            .HasColumnType("decimal(18,2)");
-
-        base.OnModelCreating(modelBuilder);
+        public DbSet<Product> Products { get; set; } = null!;
     }
 }
