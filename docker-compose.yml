@@ -109,7 +109,8 @@ services:
       dockerfile: Dockerfile
     container_name: ecommerce-gateway
     environment:
-      - ASPNETCORE_URLS=http://+:${GATEWAY_PORT}
+      #- ASPNETCORE_URLS=http://+:${GATEWAY_PORT}
+      - ASPNETCORE_URLS=https://+:5002;http://+:5000
       - DOTNET_ENVIRONMENT=Development
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ISSUER=${JWT_ISSUER}

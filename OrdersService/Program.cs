@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 // JWT secret fallback (development-safe)
 var jwtSecret = builder.Configuration["JWT_SECRET"]
                 ?? builder.Configuration["JWT:Secret"]
-                ?? "dev_fallback_jwt_secret_ChangeMe!";
+                ?? "mysuperlongrandomsecretkey_ChangeThis123!";
 
 var key = Encoding.ASCII.GetBytes(jwtSecret);
 
@@ -76,9 +76,10 @@ var app = builder.Build();
 // Apply migrations at startup (development convenience)
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
     try
     {
+        var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
+
         db.Database.Migrate();
     }
     catch (Exception ex)
@@ -94,7 +95,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -20,13 +20,13 @@ namespace InventoryService.Controllers
 
         // GET: api/products
         [HttpGet]
-        [AllowAnonymous] // só para facilitar teste
+        [AllowAnonymous] // só para facilitar testes iniciais
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
             return await _context.Products.ToListAsync();
         }
 
-        // GET: api/products/{id}
+        // GET: api/products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
@@ -48,7 +48,7 @@ namespace InventoryService.Controllers
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
 
-        // PUT: api/products/{id}
+        // PUT: api/products/5
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateProduct(int id, Product product)
         {
@@ -61,7 +61,7 @@ namespace InventoryService.Controllers
             return NoContent();
         }
 
-        // DELETE: api/products/{id}
+        // DELETE: api/products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {

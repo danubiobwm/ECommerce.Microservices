@@ -24,9 +24,9 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
-        ValidIssuer = jwtIssuer,
+        ValidIssuer = "ECommerce",
         ValidateAudience = true,
-        ValidAudience = jwtAudience,
+        ValidAudience = "ECommerceClients",
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ValidateLifetime = true
