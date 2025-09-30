@@ -30,6 +30,21 @@ namespace InventoryService.Services
             return product;
         }
 
+        public async Task<bool> UpdateProductAsync(Product product)
+        {
+            var existing = await _context.Products.FindAsync(product.Id);
+            if (existing == null) return false;
+
+            existing.Name = product.Name;
+            existing.Description = product.Description;
+            existing.Price = product.Price;
+            existing.Stock = product.Stock;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // Update stock by delta (positive or negative)
         public async Task<bool> UpdateStockAsync(int productId, int quantityChange)
         {
             var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
@@ -44,8 +59,7 @@ namespace InventoryService.Services
         public async Task<bool> DeleteProductAsync(int productId)
         {
             var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
-            if (product == null)
-                return false;
+            if (product == null) return false;
 
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
