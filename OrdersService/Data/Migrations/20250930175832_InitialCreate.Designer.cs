@@ -12,7 +12,7 @@ using OrdersService.Data;
 namespace OrdersService.Data.Migrations
 {
     [DbContext(typeof(OrdersDbContext))]
-    [Migration("20250929213053_InitialCreate")]
+    [Migration("20250930175832_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

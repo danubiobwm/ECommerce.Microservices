@@ -6,6 +6,7 @@
         public string? CustomerId { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // adicionado Status para controlar fluxo
         public string Status { get; set; } = "Pending";
 
         public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
