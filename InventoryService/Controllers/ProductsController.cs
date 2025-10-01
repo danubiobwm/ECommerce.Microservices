@@ -8,7 +8,7 @@ namespace InventoryService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize] // exige JWT em todos os endpoints
     public class ProductsController : ControllerBase
     {
         private readonly InventoryDbContext _context;
@@ -18,28 +18,28 @@ namespace InventoryService.Controllers
             _context = context;
         }
 
-        // GET: api/products
+        // GET: api/Products
         [HttpGet]
-        [AllowAnonymous] // só para facilitar testes iniciais
+        [AllowAnonymous] // permite acesso sem login (caso queira listar produtos publicamente)
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            return await _context.Products.ToListAsync();
+            return await _context.Products.AsNoTracking().ToListAsync();
         }
 
-        // GET: api/products/5
+        // GET: api/Products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
-
             if (product == null)
                 return NotFound();
 
-            return product;
+            return Ok(product);
         }
 
-        // POST: api/products
+        // POST: api/Products
         [HttpPost]
+        [Authorize(Roles = "Admin")] // apenas Admin pode criar
         public async Task<ActionResult<Product>> CreateProduct(Product product)
         {
             _context.Products.Add(product);
@@ -48,21 +48,34 @@ namespace InventoryService.Controllers
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
 
-        // PUT: api/products/5
+        // PUT: api/Products/5
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateProduct(int id, Product product)
         {
             if (id != product.Id)
                 return BadRequest();
 
             _context.Entry(product).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Products.Any(e => e.Id == id))
+                    return NotFound();
+                else
+                    throw;
+            }
 
             return NoContent();
         }
 
-        // DELETE: api/products/5
+        // DELETE: api/Products/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
             var product = await _context.Products.FindAsync(id);
