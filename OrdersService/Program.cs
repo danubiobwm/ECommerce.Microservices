@@ -1,5 +1,6 @@
 using OrdersService.Data;
 using OrdersService.Services;
+using OrdersService.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -8,24 +9,26 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Connection string com retry ---
+// Connections
 var conn = builder.Configuration.GetConnectionString("Default")
            ?? builder.Configuration["ConnectionStrings__Default"]
-           ?? $"Server={builder.Configuration["SQLSERVER_HOST"] ?? "mssql"},{builder.Configuration["SQLSERVER_PORT"] ?? "1433"};Database=OrdersDb;User Id={builder.Configuration["DB_USER"] ?? "sa"};Password={builder.Configuration["DB_PASSWORD"] ?? "Your_password123"};TrustServerCertificate=True;ConnectRetryCount=5;ConnectRetryInterval=10;MultipleActiveResultSets=true;";
+           ?? $"Server={builder.Configuration["SQLSERVER_HOST"] ?? "mssql"},{builder.Configuration["SQLSERVER_PORT"] ?? "1433"};Database={builder.Configuration["ORDERS_DB"] ?? "OrdersDb"};User Id={builder.Configuration["DB_USER"] ?? "sa"};Password={builder.Configuration["MSSQL_SA_PASSWORD"] ?? "P@ssw0rd123!"};TrustServerCertificate=True;ConnectRetryCount=5;ConnectRetryInterval=10;MultipleActiveResultSets=true;";
 
-// --- JWT config ---
-var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("JWT_SECRET não configurado");
+// JWT
+var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("JWT_SECRET not provided");
 var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerce";
 var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceClients";
 var key = Encoding.ASCII.GetBytes(jwtSecret);
 
-// --- DbContext ---
-builder.Services.AddDbContext<OrdersDbContext>(options => options.UseSqlServer(conn));
+// EF
+builder.Services.AddDbContext<OrdersDbContext>(o => o.UseSqlServer(conn));
 
-// --- Services ---
+// DI
+builder.Services.AddHttpClient();
 builder.Services.AddScoped<OrderService>();
+builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 
-// --- Auth ---
+// Authentication
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -35,18 +38,12 @@ builder.Services.AddAuthentication(options =>
 {
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
-    options.Events = new JwtBearerEvents
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
     {
         OnAuthenticationFailed = ctx =>
         {
             var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ctx.Exception, "JWT falhou em OrdersService");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = ctx =>
-        {
-            var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("JWT válido para {user}", ctx.Principal?.Identity?.Name);
+            logger.LogError(ctx.Exception, "JWT failed in OrdersService");
             return Task.CompletedTask;
         }
     };
@@ -62,8 +59,15 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// --- Swagger ---
-builder.Services.AddControllers();
+// Controllers + Swagger
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+    {
+        // Evita erro de ciclo infinito
+        opt.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        opt.JsonSerializerOptions.WriteIndented = true;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -82,9 +86,10 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+
 var app = builder.Build();
 
-// --- Migrations auto ---
+// Apply migrations
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -92,11 +97,12 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<OrdersDbContext>();
         db.Database.Migrate();
-        logger.LogInformation("Migrations aplicadas em OrdersDb");
+        logger.LogInformation("Applied Orders migrations");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Erro aplicando migrations OrdersDb");
+        var logger2 = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger2.LogError(ex, "Failed to apply migrations for OrdersDb");
     }
 }
 
@@ -106,8 +112,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 app.Run();

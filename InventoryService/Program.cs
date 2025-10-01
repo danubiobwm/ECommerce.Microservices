@@ -1,5 +1,6 @@
 using InventoryService.Data;
 using InventoryService.Services;
+using InventoryService.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -8,24 +9,20 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- Connection string com retry ---
 var conn = builder.Configuration.GetConnectionString("Default")
            ?? builder.Configuration["ConnectionStrings__Default"]
-           ?? $"Server={builder.Configuration["SQLSERVER_HOST"] ?? "mssql"},{builder.Configuration["SQLSERVER_PORT"] ?? "1433"};Database=InventoryDb;User Id={builder.Configuration["DB_USER"] ?? "sa"};Password={builder.Configuration["DB_PASSWORD"] ?? "Your_password123"};TrustServerCertificate=True;ConnectRetryCount=5;ConnectRetryInterval=10;MultipleActiveResultSets=true;";
+           ?? $"Server={builder.Configuration["SQLSERVER_HOST"] ?? "mssql"},{builder.Configuration["SQLSERVER_PORT"] ?? "1433"};Database={builder.Configuration["INVENTORY_DB"] ?? "InventoryDb"};User Id={builder.Configuration["DB_USER"] ?? "sa"};Password={builder.Configuration["MSSQL_SA_PASSWORD"] ?? builder.Configuration["MSSQL_SA_PASSWORD"] ?? builder.Configuration["MSSQL_SA_PASSWORD"] ?? "P@ssw0rd123!"};TrustServerCertificate=True;ConnectRetryCount=5;ConnectRetryInterval=10;MultipleActiveResultSets=true;";
 
-// --- JWT config (mesmo que AuthService) ---
-var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("JWT_SECRET não configurado");
-var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerce";
-var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceClients";
+var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("JWT_SECRET not provided");
+var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? builder.Configuration["JWT:Issuer"] ?? "ECommerce";
+var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? builder.Configuration["JWT:Audience"] ?? "ECommerceClients";
 var key = Encoding.ASCII.GetBytes(jwtSecret);
 
-// --- DbContext ---
 builder.Services.AddDbContext<InventoryDbContext>(options => options.UseSqlServer(conn));
-
-// --- Services ---
 builder.Services.AddScoped<ProductService>();
 
-// --- Auth ---
+builder.Services.AddHostedService<OrderCreatedConsumer>();
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -35,18 +32,18 @@ builder.Services.AddAuthentication(options =>
 {
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
-    options.Events = new JwtBearerEvents
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
     {
         OnAuthenticationFailed = ctx =>
         {
             var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ctx.Exception, "JWT falhou em InventoryService");
+            logger.LogError(ctx.Exception, "Authentication failed in InventoryService");
             return Task.CompletedTask;
         },
         OnTokenValidated = ctx =>
         {
             var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("JWT válido para {user}", ctx.Principal?.Identity?.Name);
+            logger.LogInformation("Token validated for {user}", ctx.Principal?.Identity?.Name);
             return Task.CompletedTask;
         }
     };
@@ -62,7 +59,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// --- Swagger ---
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -84,7 +80,6 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// --- Migrations auto ---
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -92,11 +87,12 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
         db.Database.Migrate();
-        logger.LogInformation("Migrations aplicadas em InventoryDb");
+        logger.LogInformation("Applied Inventory migrations");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Erro aplicando migrations InventoryDb");
+        var logger2 = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger2.LogError(ex, "Failed to apply migrations for InventoryDb");
     }
 }
 
@@ -106,8 +102,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 app.Run();

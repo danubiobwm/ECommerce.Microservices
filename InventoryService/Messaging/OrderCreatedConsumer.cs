@@ -1,93 +1,69 @@
-﻿using InventoryService.Services;
+﻿using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using System.Text;
-using System.Text.Json;
+using InventoryService.Services;
+using InventoryService.Messaging;
 
-namespace InventoryService.Messaging;
-
-public class OrderCreatedEvent
+namespace InventoryService.Messaging
 {
-public int OrderId { get; set; }
-public List<OrderItem> Items { get; set; } = new();
-}
-public class OrderItem
-{
-public int ProductId { get; set; }
-public int Quantity { get; set; }
-}
-
-public class OrderCreatedConsumer : BackgroundService
-{
-private readonly IConfiguration _config;
-private readonly ILogger<OrderCreatedConsumer> _logger;
-private readonly IServiceProvider _sp;
-private IConnection? _connection;
-private IModel? _channel;
-
-public OrderCreatedConsumer(IConfiguration config, ILogger<OrderCreatedConsumer> logger, IServiceProvider sp)
-{
-    _config = config;
-    _logger = logger;
-    _sp = sp;
-
-    var factory = new ConnectionFactory
+    public class OrderCreatedConsumer : BackgroundService
     {
-        HostName = _config["RABBITMQ__HOST"] ?? "rabbitmq",
-        UserName = _config["RABBITMQ__USER"] ?? "guest",
-        Password = _config["RABBITMQ__PASS"] ?? "guest",
-        DispatchConsumersAsync = true
-    };
+        private readonly IServiceProvider _sp;
+        private readonly IConnection _connection;
+        private readonly IModel _channel;
+        private readonly string _queueName = "order_created";
 
-    _connection = factory.CreateConnection();
-    _channel = _connection.CreateModel();
-    _channel.ExchangeDeclare(exchange: "orders", type: ExchangeType.Fanout, durable: true);
-    _channel.QueueDeclare(queue: "inventory.order.created", durable: true, exclusive: false, autoDelete: false);
-    _channel.QueueBind("inventory.order.created", "orders", "");
-}
-
-protected override Task ExecuteAsync(CancellationToken stoppingToken)
-{
-    var consumer = new AsyncEventingBasicConsumer(_channel);
-    consumer.Received += async (model, ea) =>
-    {
-        try
+        public OrderCreatedConsumer(IServiceProvider sp, IConfiguration configuration)
         {
-            var body = ea.Body.ToArray();
-            var json = Encoding.UTF8.GetString(body);
-            var ev = JsonSerializer.Deserialize<OrderCreatedEvent>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            if (ev != null)
+            _sp = sp;
+            var factory = new ConnectionFactory()
             {
-                using var scope = _sp.CreateScope();
-                var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
-                foreach (var item in ev.Items)
+                HostName = configuration["RABBITMQ__HOST"] ?? "rabbitmq",
+                UserName = configuration["RABBITMQ__USER"] ?? "guest",
+                Password = configuration["RABBITMQ__PASS"] ?? "guest",
+                DispatchConsumersAsync = true
+            };
+            _connection = factory.CreateConnection();
+            _channel = _connection.CreateModel();
+            _channel.QueueDeclare(queue: _queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
+        }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            var consumer = new AsyncEventingBasicConsumer(_channel);
+            consumer.Received += async (model, ea) =>
+            {
+                try
                 {
-                    var ok = await productService.ReduceStock(item.ProductId, item.Quantity);
-                    if (!ok) _logger.LogWarning("Falha ao reduzir estoque do produto {id}", item.ProductId);
+                    var bytes = ea.Body.ToArray();
+                    var json = Encoding.UTF8.GetString(bytes);
+                    var msg = JsonSerializer.Deserialize<OrderItemMessage>(json);
+                    if (msg != null)
+                    {
+                        using var scope = _sp.CreateScope();
+                        var svc = scope.ServiceProvider.GetRequiredService<ProductService>();
+                        await svc.DecreaseStockAsync(msg.ProductId, msg.Quantity);
+                    }
+                    _channel.BasicAck(ea.DeliveryTag, false);
                 }
-            }
+                catch
+                {
+                    _channel.BasicNack(ea.DeliveryTag, false, false);
+                }
+            };
+
+            _channel.BasicConsume(queue: _queueName, autoAck: false, consumer: consumer);
+            return Task.CompletedTask;
         }
-        catch (Exception ex)
+
+        public override void Dispose()
         {
-            _logger.LogError(ex, "Erro processando evento order.created");
+            _channel?.Dispose();
+            _connection?.Dispose();
+            base.Dispose();
         }
-        finally
-        {
-            _channel?.BasicAck(ea.DeliveryTag, false);
-        }
-    };
-
-    _channel.BasicConsume(queue: "inventory.order.created", autoAck: false, consumer: consumer);
-    return Task.CompletedTask;
-}
-
-public override void Dispose()
-{
-    _channel?.Close();
-    _connection?.Close();
-    base.Dispose();
-}
-
+    }
 }

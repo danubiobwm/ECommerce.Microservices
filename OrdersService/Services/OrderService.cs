@@ -1,60 +1,61 @@
-﻿using Microsoft.EntityFrameworkCore;
-using OrdersService.Data;
-using OrdersService.Models;
+﻿using OrdersService.Models;
+using OrdersService.DTOs;
 
 namespace OrdersService.Services
 {
     public class OrderService
     {
-        private readonly OrdersDbContext _context;
+        private readonly List<Order> _orders = new();
+        private int _nextId = 1;
 
-        public OrderService(OrdersDbContext context)
+        public async Task<(bool Success, string? Error, OrderResponseDto? Order)> CreateAsync(OrderCreateDto dto)
         {
-            _context = context;
+            var order = new Order
+            {
+                Id = _nextId++,
+                CustomerId = dto.CustomerId,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow,
+                Items = dto.Items.Select(i => new OrderItem
+                {
+                    ProductId = i.ProductId,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            };
+
+            _orders.Add(order);
+
+            return (true, null, MapToResponse(order));
         }
 
-        public async Task<Order?> GetOrderByIdAsync(int id)
+        public async Task<OrderResponseDto?> GetByIdAsync(int id)
         {
-            return await _context.Orders
-                                 .Include(o => o.Items)
-                                 .FirstOrDefaultAsync(o => o.Id == id);
+            var order = _orders.FirstOrDefault(o => o.Id == id);
+            return order == null ? null : MapToResponse(order);
         }
 
-        public async Task<IEnumerable<Order>> GetAllOrdersAsync()
+        public async Task<List<OrderResponseDto>> GetAllAsync()
         {
-            return await _context.Orders.Include(o => o.Items).ToListAsync();
+            return _orders.Select(MapToResponse).ToList();
         }
 
-        public async Task<Order> CreateOrderAsync(Order order)
+        private static OrderResponseDto MapToResponse(Order order)
         {
-            order.Status = "Pending";
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
-            return order;
-        }
-
-        public async Task<bool> UpdateOrderStatusAsync(int orderId, string status)
-        {
-            var order = await _context.Orders.FindAsync(orderId);
-            if (order == null)
-                return false;
-
-            order.Status = status;
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<bool> DeleteOrderAsync(int orderId)
-        {
-            var order = await _context.Orders.Include(o => o.Items)
-                                             .FirstOrDefaultAsync(o => o.Id == orderId);
-            if (order == null)
-                return false;
-
-            _context.OrderItems.RemoveRange(order.Items);
-            _context.Orders.Remove(order);
-            await _context.SaveChangesAsync();
-            return true;
+            return new OrderResponseDto
+            {
+                Id = order.Id,
+                CustomerId = order.CustomerId,
+                CreatedAt = order.CreatedAt,
+                Status = order.Status,
+                Items = order.Items.Select(i => new OrderItemResponseDto
+                {
+                    Id = i.Id,
+                    ProductId = i.ProductId,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            };
         }
     }
 }

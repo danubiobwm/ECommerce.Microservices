@@ -1,6 +1,6 @@
-﻿using InventoryService.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using InventoryService.Data;
 using InventoryService.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace InventoryService.Services
 {
@@ -13,55 +13,47 @@ namespace InventoryService.Services
             _context = context;
         }
 
-        public async Task<Product?> GetProductByIdAsync(int id)
-        {
-            return await _context.Products.FirstOrDefaultAsync(p => p.Id == id);
-        }
+        public async Task<IEnumerable<Product>> GetAllAsync()
+            => await _context.Products.AsNoTracking().ToListAsync();
 
-        public async Task<IEnumerable<Product>> GetAllProductsAsync()
-        {
-            return await _context.Products.ToListAsync();
-        }
+        public async Task<Product?> GetByIdAsync(int id)
+            => await _context.Products.FindAsync(id);
 
-        public async Task<Product> CreateProductAsync(Product product)
+        public async Task<Product> CreateAsync(Product p)
         {
-            _context.Products.Add(product);
+            _context.Products.Add(p);
             await _context.SaveChangesAsync();
-            return product;
+            return p;
         }
 
-        public async Task<bool> UpdateProductAsync(Product product)
+        public async Task<bool> UpdateAsync(Product p)
         {
-            var existing = await _context.Products.FindAsync(product.Id);
+            var existing = await _context.Products.FindAsync(p.Id);
             if (existing == null) return false;
 
-            existing.Name = product.Name;
-            existing.Description = product.Description;
-            existing.Price = product.Price;
-            existing.Stock = product.Stock;
-
+            existing.Name = p.Name;
+            existing.Description = p.Description;
+            existing.Price = p.Price;
+            existing.Stock = p.Stock;
             await _context.SaveChangesAsync();
             return true;
         }
 
-        // Update stock by delta (positive or negative)
-        public async Task<bool> UpdateStockAsync(int productId, int quantityChange)
+        public async Task<bool> DeleteAsync(int id)
         {
-            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
-            if (product == null)
-                return false;
-
-            product.Stock += quantityChange;
+            var existing = await _context.Products.FindAsync(id);
+            if (existing == null) return false;
+            _context.Products.Remove(existing);
             await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<bool> DeleteProductAsync(int productId)
+        public async Task<bool> DecreaseStockAsync(int productId, int quantity)
         {
-            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
-            if (product == null) return false;
-
-            _context.Products.Remove(product);
+            var p = await _context.Products.FindAsync(productId);
+            if (p == null) return false;
+            p.Stock -= quantity;
+            if (p.Stock < 0) p.Stock = 0; // safeguard
             await _context.SaveChangesAsync();
             return true;
         }

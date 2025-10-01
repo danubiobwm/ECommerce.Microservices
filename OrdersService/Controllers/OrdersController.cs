@@ -1,95 +1,48 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using OrdersService.Data;
-using OrdersService.Models;
+﻿using Microsoft.AspNetCore.Mvc;
+using OrdersService.Services;
+using OrdersService.DTOs;
 
 namespace OrdersService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
     public class OrdersController : ControllerBase
     {
-        private readonly OrdersDbContext _context;
+        private readonly OrderService _orderService;
 
-        public OrdersController(OrdersDbContext context)
+        public OrdersController(OrderService orderService)
         {
-            _context = context;
+            _orderService = orderService;
         }
 
-        // GET: api/Orders
-        [HttpGet]
-        [Authorize(Roles = "Admin")] // só Admin pode ver todos
-        public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] OrderCreateDto dto)
         {
-            return await _context.Orders
-                .Include(o => o.Items)
-                .AsNoTracking()
-                .ToListAsync();
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var (success, error, order) = await _orderService.CreateAsync(dto);
+            if (!success || order == null)
+                return BadRequest(error);
+
+            return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
         }
 
-        // GET: api/Orders/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Order>> GetOrder(int id)
+        public async Task<IActionResult> GetById(int id)
         {
-            var order = await _context.Orders
-                .Include(o => o.Items)
-                .FirstOrDefaultAsync(o => o.Id == id);
-
+            var order = await _orderService.GetByIdAsync(id);
             if (order == null)
                 return NotFound();
 
             return Ok(order);
         }
 
-        // POST: api/Orders
-        [HttpPost]
-        public async Task<ActionResult<Order>> CreateOrder(Order order)
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
         {
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
-        }
-
-        // PUT: api/Orders/5
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateOrder(int id, Order order)
-        {
-            if (id != order.Id)
-                return BadRequest();
-
-            _context.Entry(order).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Orders.Any(e => e.Id == id))
-                    return NotFound();
-                else
-                    throw;
-            }
-
-            return NoContent();
-        }
-
-        // DELETE: api/Orders/5
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")] // só Admin pode deletar
-        public async Task<IActionResult> DeleteOrder(int id)
-        {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null)
-                return NotFound();
-
-            _context.Orders.Remove(order);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            var orders = await _orderService.GetAllAsync();
+            return Ok(orders);
         }
     }
 }

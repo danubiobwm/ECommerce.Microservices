@@ -4,43 +4,64 @@ using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
-namespace AuthService.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-public class AuthController : ControllerBase
+namespace AuthService.Controllers
 {
-    private readonly IConfiguration _config;
-    public AuthController(IConfiguration config) { _config = config; }
-
-    private static readonly List<(string Username, string Password, string Role)> Users = new() {
-        ("admin","admin123","Admin"),
-        ("user","user123","User")
-    };
-
-    [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginModel model)
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AuthController : ControllerBase
     {
-        var user = Users.FirstOrDefault(u => u.Username == model.Username && u.Password == model.Password);
-        if (user == default) return Unauthorized(new { message = "Invalid credentials" });
+        // user list already in your code
+        private static readonly List<(string Username, string Password, string Role)> Users = new() {
+            ("admin","admin123","Admin"),
+            ("user","user123","User")
+        };
 
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(_config["JWT_SECRET"]);
-        var tokenDescriptor = new SecurityTokenDescriptor
+        private readonly IConfiguration _cfg;
+
+        public AuthController(IConfiguration cfg) => _cfg = cfg;
+
+        [HttpPost("login")]
+        public IActionResult Login([FromBody] LoginRequest req)
         {
-            Subject = new ClaimsIdentity(new Claim[]
+            var user = Users.FirstOrDefault(u => u.Username == req.Username && u.Password == req.Password);
+            if (user == default) return Unauthorized();
+
+            var jwtSecret = _cfg["JWT_SECRET"] ?? throw new Exception("JWT_SECRET not configured");
+            var jwtIssuer = _cfg["JWT_ISSUER"] ?? "ECommerce";
+            var jwtAudience = _cfg["JWT_AUDIENCE"] ?? "ECommerceClients";
+            var expiryMinutes = int.Parse(_cfg["JWT_EXPIRES_MINUTES"] ?? "60");
+
+            var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role)
-            }),
-            Expires = DateTime.UtcNow.AddMinutes(int.Parse(_config["JWT_EXPIRES_MINUTES"] ?? "60")),
-            Issuer = _config["JWT_ISSUER"],
-            Audience = _config["JWT_AUDIENCE"],
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-        };
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return Ok(new { token = tokenHandler.WriteToken(token) });
-    }
+                new Claim("role", user.Role),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Username),
+            };
+            if (!string.IsNullOrEmpty(user.Role))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, user.Role));
+            }
 
-    public class LoginModel { public string Username { get; set; } = ""; public string Password { get; set; } = ""; }
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: jwtIssuer,
+                audience: jwtAudience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
+                signingCredentials: creds
+            );
+
+            var tokenStr = new JwtSecurityTokenHandler().WriteToken(token);
+
+            return Ok(new { token = tokenStr });
+        }
+
+        public class LoginRequest
+        {
+            public string Username { get; set; } = null!;
+            public string Password { get; set; } = null!;
+        }
+    }
 }

@@ -1,90 +1,69 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using InventoryService.Data;
 using InventoryService.Models;
+using InventoryService.Services;
 
 namespace InventoryService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize] // exige JWT em todos os endpoints
+    [Authorize] // exige JWT por padrão
     public class ProductsController : ControllerBase
     {
-        private readonly InventoryDbContext _context;
+        private readonly ProductService _service;
 
-        public ProductsController(InventoryDbContext context)
+        public ProductsController(ProductService service)
         {
-            _context = context;
+            _service = service;
         }
 
         // GET: api/Products
         [HttpGet]
-        [AllowAnonymous] // permite acesso sem login (caso queira listar produtos publicamente)
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+        [AllowAnonymous] // público para consulta de catálogo
+        public async Task<IActionResult> GetAll()
         {
-            return await _context.Products.AsNoTracking().ToListAsync();
+            var list = await _service.GetAllAsync();
+            return Ok(list);
         }
 
-        // GET: api/Products/5
+        // GET: api/Products/{id}
         [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(int id)
+        [AllowAnonymous]
+        public async Task<IActionResult> Get(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
-                return NotFound();
-
-            return Ok(product);
+            var p = await _service.GetByIdAsync(id);
+            if (p == null) return NotFound();
+            return Ok(p);
         }
 
-        // POST: api/Products
+        // POST: api/Products  (Admin only)
         [HttpPost]
-        [Authorize(Roles = "Admin")] // apenas Admin pode criar
-        public async Task<ActionResult<Product>> CreateProduct(Product product)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create([FromBody] Product p)
         {
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+            var created = await _service.CreateAsync(p);
+            return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
         }
 
-        // PUT: api/Products/5
+        // PUT: api/Products/{id} (Admin only)
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> UpdateProduct(int id, Product product)
+        public async Task<IActionResult> Update(int id, [FromBody] Product p)
         {
-            if (id != product.Id)
-                return BadRequest();
-
-            _context.Entry(product).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Products.Any(e => e.Id == id))
-                    return NotFound();
-                else
-                    throw;
-            }
-
+            if (id != p.Id) return BadRequest();
+            var ok = await _service.UpdateAsync(p);
+            if (!ok) return NotFound();
             return NoContent();
         }
 
-        // DELETE: api/Products/5
+        // DELETE: api/Products/{id} (Admin only)
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> DeleteProduct(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
-                return NotFound();
-
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
-
+            var ok = await _service.DeleteAsync(id);
+            if (!ok) return NotFound();
             return NoContent();
         }
     }
