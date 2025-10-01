@@ -1,11 +1,11 @@
+
 ### 1. Registrar usuário
 POST http://localhost:5001/api/Auth/register
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "admin123",
-  "email": "admin@admin.com"
+  "username": "user",
+  "password": "user123",
 }
 
 ### 2. Login e obter token
@@ -18,7 +18,7 @@ Content-Type: application/json
 }
 
 ### ⚠️ Copie o token retornado e substitua no Authorization abaixo ⚠️
-@token=eyJhbGciOi...
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFkbWluIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzU5Mjg0OTQ2LCJleHAiOjE3NTkyODg1NDYsImlhdCI6MTc1OTI4NDk0NiwiaXNzIjoiRUNvbW1lcmNlIiwiYXVkIjoiRUNvbW1lcmNlQ2xpZW50cyJ9.ZqDVMWlJO3Pzg4TqEUzm2xQcdm9FkNUvU1ynkxOjapc
 
 ### 3. Criar produto
 POST http://localhost:5002/api/Products
