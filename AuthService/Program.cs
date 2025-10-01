@@ -5,13 +5,20 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// JWT config (pegar de appsettings.json ou vari�veis de ambiente)
-var jwtSecret = builder.Configuration["JWT_SECRET"] ?? throw new Exception("JWT_SECRET not set");
-var jwtIssuer = builder.Configuration["JWT_ISSUER"] ?? "ECommerceAuth";
-var jwtAudience = builder.Configuration["JWT_AUDIENCE"] ?? "ECommerceClients";
+// --- JWT configuration (read from env or appsettings)
+var jwtSecret = builder.Configuration["JWT_SECRET"]
+                ?? builder.Configuration["JWT:Secret"]
+                ?? throw new Exception("JWT secret not set. Set JWT_SECRET environment variable or JWT:Secret in appsettings.");
+var jwtIssuer = builder.Configuration["JWT_ISSUER"]
+                ?? builder.Configuration["JWT:Issuer"]
+                ?? "ECommerce";
+var jwtAudience = builder.Configuration["JWT_AUDIENCE"]
+                ?? builder.Configuration["JWT:Audience"]
+                ?? "ECommerceClients";
 
 var key = Encoding.UTF8.GetBytes(jwtSecret);
 
+// Authentication configuration
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -23,41 +30,35 @@ builder.Services.AddAuthentication(options =>
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = true,
-        ValidIssuer = "ECommerce",
-        ValidateAudience = true,
-        ValidAudience = "ECommerceClients",
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateLifetime = true
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ClockSkew = TimeSpan.Zero
     };
 });
 
+// Controllers + Swagger
 builder.Services.AddControllers();
-
-// Swagger - com suporte ao Bearer token
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "AuthService", Version = "v1" });
-
+    c.SwaggerDoc("v1", new() { Title = "Auth API", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        In = ParameterLocation.Header,
-        Description = "Por favor coloque o token JWT com Bearer",
         Name = "Authorization",
         Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Insira o token JWT assim: 'Bearer {token}'"
     });
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement {
         {
-            new OpenApiSecurityScheme {
-                Reference = new OpenApiReference {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            new string[]{}
+            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+            Array.Empty<string>()
         }
     });
 });

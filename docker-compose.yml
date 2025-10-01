@@ -64,6 +64,8 @@ services:
       - DOTNET_ENVIRONMENT=Development
       - ConnectionStrings__Default=Server=mssql,1433;Database=${INVENTORY_DB};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
       - JWT_SECRET=${JWT_SECRET}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - JWT_AUDIENCE=${JWT_AUDIENCE}
       - RABBITMQ__HOST=rabbitmq
       - RABBITMQ__USER=${RABBITMQ_USER}
       - RABBITMQ__PASS=${RABBITMQ_PASS}
@@ -87,6 +89,8 @@ services:
       - DOTNET_ENVIRONMENT=Development
       - ConnectionStrings__Default=Server=mssql,1433;Database=${ORDERS_DB};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
       - JWT_SECRET=${JWT_SECRET}
+      - JWT_ISSUER=${JWT_ISSUER}
+      - JWT_AUDIENCE=${JWT_AUDIENCE}
       - INVENTORY_URL=http://inventory:5002
       - RABBITMQ__HOST=rabbitmq
       - RABBITMQ__USER=${RABBITMQ_USER}
@@ -109,14 +113,13 @@ services:
       dockerfile: Dockerfile
     container_name: ecommerce-gateway
     environment:
-      #- ASPNETCORE_URLS=http://+:${GATEWAY_PORT}
-      - ASPNETCORE_URLS=https://+:5002;http://+:5000
+      - ASPNETCORE_URLS=http://+:8000
       - DOTNET_ENVIRONMENT=Development
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ISSUER=${JWT_ISSUER}
       - JWT_AUDIENCE=${JWT_AUDIENCE}
     ports:
-      - "${GATEWAY_PORT}:${GATEWAY_PORT}"
+      - "8000:8000"
     depends_on:
       auth:
         condition: service_started

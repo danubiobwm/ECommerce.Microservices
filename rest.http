@@ -107,3 +107,13 @@ Content-Type: application/json
 ### 8) Buscar pedido por ID
 GET {{baseUrl}}/orders/{{orderId}}
 Authorization: Bearer {{token}}
+
+
+###
+POST http://localhost:8000/api/auth/register
+Content-Type: application/json
+{
+    "username": "test",
+    "password": "test123",
+    "email": "test@test.com"
+}
