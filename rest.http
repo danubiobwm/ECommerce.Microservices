@@ -14,9 +14,12 @@ Content-Type: application/json
   "username": "user",
   "password": "user123"
 }
-### copy the token value returned as {token}
+### copy the token value returned as {token}Admin
 
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIiLCJyb2xlIjoiVXNlciIsIm5iZiI6MTc1OTQxNjgwMSwiZXhwIjoxNzU5NDIwNDAxLCJpYXQiOjE3NTk0MTY4MDEsImlzcyI6IkVDb21tZXJjZSIsImF1ZCI6IkVDb21tZXJjZUNsaWVudHMifQ.hagwmD0W_peZ3eKSCqo8txFj728Jx8eruRRyrA8N5qk
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFkbWluIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzU5NDQ0NDU3LCJleHAiOjE3NTk0NDgwNTcsImlhdCI6MTc1OTQ0NDQ1NywiaXNzIjoiRUNvbW1lcmNlIiwiYXVkIjoiRUNvbW1lcmNlQ2xpZW50cyJ9.rudG2sU4i9oDUfqmFKlgx6IT4I_VJApUITuZyCu3Ko8
+
+### copy the token value returned as {token}User
+@tokenUser = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIiLCJyb2xlIjoiVXNlciIsIm5iZiI6MTc1OTQ0NDQ2OSwiZXhwIjoxNzU5NDQ4MDY5LCJpYXQiOjE3NTk0NDQ0NjksImlzcyI6IkVDb21tZXJjZSIsImF1ZCI6IkVDb21tZXJjZUNsaWVudHMifQ.BsR7WEUhNcYzXpX19BpfCtRG2vO4SknAJytvDXHsPew
 
 ### 2) Create product (Admin)
 POST http://localhost:5002/api/Products
@@ -36,17 +39,22 @@ Accept: application/json
 
 ### 4) Create order (authenticated user; use "user" or "admin")
 POST http://localhost:5003/api/Orders
-Authorization: Bearer {{token}}
+Authorization: Bearer {{tokenUser}}
 Content-Type: application/json
 
 {
   "customerId": "user",
   "items": [
-    { "productId": 1, "quantity": 1, "unitPrice": 5500.00 }
+    { "productId": 1, "quantity": 5, "unitPrice": 5500.00 }
   ]
 }
 
 
+
 ### 5) List orders (Admin only)
 GET http://localhost:5003/api/Orders
+Authorization: Bearer {{token}}
+
+### 6) List orders por id(Admin only)
+GET http://localhost:5003/api/Orders/1
 Authorization: Bearer {{token}}

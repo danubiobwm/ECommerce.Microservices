@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OrdersService.DTOs
 {
+
     public class OrderCreateDto
     {
         [Required]
@@ -11,10 +12,10 @@ namespace OrdersService.DTOs
 
         [Required]
         [MinLength(1, ErrorMessage = "É necessário pelo menos 1 item no pedido.")]
-        public List<OrderItemDto> Items { get; set; } = new();
+        public List<OrderItemCreateDto> Items { get; set; } = new();
     }
 
-    public class OrderItemDto
+    public class OrderItemCreateDto
     {
         [Required]
         public int ProductId { get; set; }
@@ -29,8 +30,16 @@ namespace OrdersService.DTOs
     public class OrderResponseDto
     {
         public int Id { get; set; }
+        public string CustomerId { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-        public string Status { get; set; } = null!;
-        public List<OrderItemDto> Items { get; set; } = new();
+        public string Status { get; set; } = "Pending";
+        public List<OrderItemResponseDto> Items { get; set; } = new();
+    }
+
+    public class OrderItemResponseDto
+    {
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
     }
 }
