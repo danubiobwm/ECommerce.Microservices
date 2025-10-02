@@ -6,7 +6,7 @@ namespace OrdersService.Models
     public class Order
     {
         public int Id { get; set; }
-        public string CustomerId { get; set; } = string.Empty;
+        public string CustomerId { get; set; } = null!;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public string Status { get; set; } = "Pending";
 

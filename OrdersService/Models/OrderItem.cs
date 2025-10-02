@@ -12,6 +12,6 @@ namespace OrdersService.Models
         public int OrderId { get; set; }
 
         [JsonIgnore]
-        public Order? Order { get; set; }
+        public Order Order { get; set; } = null!;
     }
 }

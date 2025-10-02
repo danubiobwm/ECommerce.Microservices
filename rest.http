@@ -16,7 +16,7 @@ Content-Type: application/json
 }
 ### copy the token value returned as {token}
 
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6ImFkbWluIiwicm9sZSI6IkFkbWluIiwibmJmIjoxNzU5MzI5NDQxLCJleHAiOjE3NTkzMzMwNDEsImlhdCI6MTc1OTMyOTQ0MSwiaXNzIjoiRUNvbW1lcmNlIiwiYXVkIjoiRUNvbW1lcmNlQ2xpZW50cyJ9.ytsit8tC5t_KMTdp7d3xcWf6YcH4uBlqofnBARW3-uc
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InVzZXIiLCJyb2xlIjoiVXNlciIsIm5iZiI6MTc1OTQxNjgwMSwiZXhwIjoxNzU5NDIwNDAxLCJpYXQiOjE3NTk0MTY4MDEsImlzcyI6IkVDb21tZXJjZSIsImF1ZCI6IkVDb21tZXJjZUNsaWVudHMifQ.hagwmD0W_peZ3eKSCqo8txFj728Jx8eruRRyrA8N5qk
 
 ### 2) Create product (Admin)
 POST http://localhost:5002/api/Products
@@ -45,6 +45,7 @@ Content-Type: application/json
     { "productId": 1, "quantity": 1, "unitPrice": 5500.00 }
   ]
 }
+
 
 ### 5) List orders (Admin only)
 GET http://localhost:5003/api/Orders

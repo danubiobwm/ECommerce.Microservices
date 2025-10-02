@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using OrdersService.Services;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using OrdersService.DTOs;
+using OrdersService.Services;
 
 namespace OrdersService.Controllers
 {
@@ -8,41 +9,42 @@ namespace OrdersService.Controllers
     [Route("api/[controller]")]
     public class OrdersController : ControllerBase
     {
-        private readonly OrderService _orderService;
+        private readonly OrderService _service;
 
-        public OrdersController(OrderService orderService)
+        public OrdersController(OrderService service)
         {
-            _orderService = orderService;
+            _service = service;
         }
 
+        // Criar pedido (user ou admin)
         [HttpPost]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> Create([FromBody] OrderCreateDto dto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            var result = await _service.CreateAsync(dto);
 
-            var (success, error, order) = await _orderService.CreateAsync(dto);
-            if (!success || order == null)
-                return BadRequest(error);
+            if (!result.Success)
+                return BadRequest(result.Error);
 
-            return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
+            return Ok(result.Order);
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            var order = await _orderService.GetByIdAsync(id);
-            if (order == null)
-                return NotFound();
-
-            return Ok(order);
-        }
-
+        // Listar pedidos (apenas admin)
         [HttpGet]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetAll()
         {
-            var orders = await _orderService.GetAllAsync();
+            var orders = await _service.GetAllAsync();
             return Ok(orders);
+        }
+
+        // Buscar pedido por ID (user/admin)
+        [HttpGet("{id}")]
+        [Authorize(Roles = "User,Admin")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var order = await _service.GetByIdAsync(id);
+            return order == null ? NotFound() : Ok(order);
         }
     }
 }
